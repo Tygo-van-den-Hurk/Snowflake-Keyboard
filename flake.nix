@@ -28,80 +28,78 @@
   };
 
   outputs =
-    inputs:
-    with inputs;
+    inputs@{
+      self,
+      nixpkgs,
+      flake-utils,
+      treefmt-nix,
+      ...
+    }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
 
         pkgs = import nixpkgs { inherit system; };
-        inherit (nixpkgs) lib;
         treefmtEval = treefmt-nix.lib.evalModule pkgs ./.config/treefmt.nix;
-        pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
-          src = ./.;
-          hooks.nix-flake-check = {
-            enable = true;
-            name = "Nix Flake Check";
-            entry = "nix flake check";
-            pass_filenames = false;
-            stages = [ "pre-push" ];
-          };
-        };
+        pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run (import ./.config/pre-commit.nix);
+        inherit (pkgs) lib;
 
       in
       rec {
-
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Nix Flake Check ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
         checks = packages // {
           formatting = treefmtEval.config.build.check self;
+          inherit pre-commit-check;
         };
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Nix Fmt ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
         formatter = treefmtEval.config.build.wrapper;
 
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Nix Develop ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
-
-        devShells =
-          let
-
-            hardwareBuildInputs = (with pkgs; [ kicad ]) ++ (with self.packages.${system}; [ ergogen ]);
-            softwareBuildInputs = with pkgs; [ ];
-
-          in
-          rec {
-
-            default = pkgs.mkShell {
-              buildInputs = hardwareBuildInputs ++ softwareBuildInputs;
-              inherit (pre-commit-check) shellHook;
-            };
-
-            hardware = pkgs.mkShell {
-              buildInputs = hardwareBuildInputs;
-              inherit (pre-commit-check) shellHook;
-            };
-
-            software = pkgs.mkShell {
-              buildInputs = softwareBuildInputs;
-              inherit (pre-commit-check) shellHook;
-            };
-          };
-
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Nix Run ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
         apps = {
 
-          #| ---------------------------------------------- Hardware ----------------------------------------------- |#
+          ergogen = {
+            type = "app";
+            program = builtins.toString (
+              pkgs.writeShellScript "ergogen" ''
+                set -e
 
-          update-pcb = {
+                root="$(git rev-parse --show-toplevel)/hardware"
+
+                src="$root/src"
+                [ -d $src ] && mkdir --parents $src
+
+                out="$root/output"
+                [ -d $out ] && mkdir --parents $out
+
+                ${packages.ergogen}/bin/ergogen --debug --clean $src --output $out
+              ''
+            );
+          };
+
+          pcb = {
             type = "app";
             program = builtins.toString (
               pkgs.writeShellScript "update-pcb" ''
                 set -e
-                directory="$(git rev-parse --show-toplevel)/hardware/kicad/"
-                [ -d $directory ] && mkdir --parents $directory
-                cp --force ${self.packages.${system}.pcbs}/* $directory
+                nix run .#ergogen
+                root="$(git rev-parse --show-toplevel)/hardware"
+                cp $root/output/pcbs/* $root/kicad/
+              ''
+            );
+          };
+
+          watch-ergogen = {
+            type = "app";
+            program = builtins.toString (
+              pkgs.writeShellScript "watch-ergogen" ''
+                set -e
+                ${pkgs.nodemon}/bin/nodemon \
+                  --exec "nix run .#ergogen" \
+                  --watch "./hardware/src/**/*.*"
               ''
             );
           };
@@ -109,7 +107,7 @@
           watch-pcb = {
             type = "app";
             program = builtins.toString (
-              pkgs.writeShellScript "watch-pcb" ''
+              pkgs.writeShellScript "watch-ergogen" ''
                 set -e
                 ${pkgs.nodemon}/bin/nodemon \
                   --exec "nix run .#update-pcb" \
@@ -117,6 +115,23 @@
               ''
             );
           };
+        };
+
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Nix Develop ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
+
+        devShells.default = pkgs.mkShell {
+          inherit (pre-commit-check) shellHook;
+          nativeBuildInputs =
+            pre-commit-check.enabledPackages # the packages for running/testing pre-commit hooks
+            ++ (with packages; [
+              ergogen # generate the files from the config
+              jscad # generate the STL files from JScad files.
+            ])
+            ++ (with pkgs; [
+              act # Run / check GitHub Actions locally.
+              git # Pull, commit, and push changes.
+              kicad # View and wire the PCBs.
+            ]);
         };
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Nix Build ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
@@ -226,6 +241,23 @@
           cases = pkgs.stdenv.mkDerivation rec {
             name = "pcb";
             src = ./hardware/src;
+
+            buildPhase = ''
+              runHook preBuild
+
+              # cp --recursive ${hardware}/cases/* .
+
+              # echo ""
+
+              # cat cases/production.jscad
+
+              # echo ""
+
+              # ${jscad}/bin/jscad cases/production.jscad -o cases/production.stl
+
+              runHook postBuild
+            '';
+
             installPhase = ''
               runHook preInstall
 
@@ -270,6 +302,48 @@
               license = lib.licenses.mit;
             };
           };
+
+          jscad =
+            let
+
+              main-repo = pkgs.fetchFromGitHub {
+                owner = "legacy-Tygo-van-den-Hurk/";
+                repo = "OpenJSCAD.org";
+                tag = "@jscad/cli@2.3.5+lockfile";
+                hash = "sha256-hWXtHh4MKxM0X2d9JCq2IDKjAWl5IuzbrhU6XGeepSI=";
+              };
+
+            in
+            pkgs.buildNpmPackage {
+              pname = "jscad";
+              version = "2.3.5";
+
+              forceGitDeps = true;
+
+              src = "${main-repo}/packages/cli";
+              npmDepsHash = "sha256-EE9u/eauhrERi/SmjN87Xkk5C/xW8xR+GHUPdEp/s7c=";
+
+              makeCacheWritable = true;
+              dontNpmBuild = true;
+              dontNpmPrune = true;
+
+              npmPackFlags = [ "--ignore-scripts" ];
+              NODE_OPTIONS = "--openssl-legacy-provider";
+
+              doInstallCheck = true;
+
+              passthru.updateScript = pkgs.nix-update-script { };
+
+              meta = {
+                homepage = "https://openjscad.xyz/";
+                mainProgram = "jscad";
+                license = lib.licenses.mit;
+                description = ''
+                  JSCAD is a set of modular, browser and command line tools for creating parametric 2D and 3D designs
+                  with JavaScript code.
+                '';
+              };
+            };
         };
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #

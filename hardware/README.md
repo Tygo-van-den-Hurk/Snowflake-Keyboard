@@ -6,8 +6,9 @@
 
 - [Hardware](#hardware)
   - [Overview](#overview)
-  - [Kicad](#kicad)
   - [Ergogen](#ergogen)
+    - [Nix Run](#nix-run)
+    - [Nix build](#nix-build)
     - [Adding custom footprints](#adding-custom-footprints)
   - [External Resources](#external-resources)
   - [Components](#components)
@@ -16,31 +17,50 @@
 
 For the generating the files we need for the hardware we'll be using [ergogen](https://github.com/ergogen/ergogen). [Ergogen](https://github.com/ergogen/ergogen) is a program that allows you to build keyboards from a YAML config file.
 
-## Kicad
+## Ergogen
 
-Kicad is used for adding the wires to a PCB. Unfortunately every time you update the PCB you'll have to rewire it yourself. So far I've seen no way to do that manually. To update the PCB run:
+We use ergogen to build the PCBs, outlines, cases, and points for us. There are two ways to get the output of our config:
 
-```SH
-nix run .#update-pcb
+- nix run
+- nix build
+
+The difference is that `nix run` is in place while `nix build` creates a derivation and doesn't change the repo at all.
+
+### Nix Run
+
+To update the output folder without running the entire derivation:
+
+```sh
+nix run .#ergogen
 ```
 
-We keep the pcb files in the kicad folder to be tracked by version control. Since these are text files and not binary these are really easy to add to version control. If you are developing and you want rapid updates to your PCB, you can run:
+There is also a way to watch the config file and the footprints using:
 
-```SH
+```sh
+nix run .#watch-ergogen
+```
+
+If you're already past the prototyping stage and want to wire the PCB you can run:
+
+```sh
+nix run .#pcb
 nix run .#watch-pcb
 ```
 
-to automatically update the PCB on any changes.
+This will run ergogen and then copy the pcb output to the kicad folder, this way you can open kicad in the kicad folder and reopen the PCB every time you change to config to find an up to date version freshly generated.
 
-## Ergogen
+### Nix build
 
-We use ergogen to build the hardware. Ergogen builds: the PCBs, outlines, cases, and points. To build any of it use:
+To build any of it use:
 
 ```SH
 nix build .#pcbs
 nix build .#outlines
 nix build .#cases
 nix build .#points
+
+# For all of them:
+nix build .#hardware
 ```
 
 to build any of them. You can also get in a dev shell with ergogen using `nix develop` and then run ergogen manually.
@@ -58,6 +78,7 @@ If you need any footprint that this repository is missing, you can find it's Jav
 - [The ergogen docs](https://docs.ergogen.xyz/) for any questions about how ergogen works.
 - [Web-based deployments](https://ergogen.ceoloide.com/) for getting a visual impression of what the keys look like.
 - [The ergogen v4 guid I used](https://flatfootfox.com/ergogen-introduction/) for a step by step tutorial.
+- [A website that converts JS CAD to STL](https://neorama.de/). This is nice as a JS CAD file isn't useful on its own.
 
 ## Components
 

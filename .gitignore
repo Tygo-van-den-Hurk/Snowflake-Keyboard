@@ -1,18 +1,10 @@
 ### Git Ignore list
 
-# pre-commit hook config
-.pre-commit-config.yaml
-
-# direnv
-**/.direnv
-
-# Nix
-**/result
-**/result-*
+# NPM
+**/node_modules
 
 # Ergogen
 **/output
-**/dist
 
 # Kicad
 **/*_autosave*
@@ -25,3 +17,13 @@
 **/*.gbr
 **/*.gbrjob
 **/*.drl
+
+# pre-commit hook config
+.pre-commit-config.yaml
+
+# Dir env
+.direnv
+
+# Nix results
+**/result
+**/result-*

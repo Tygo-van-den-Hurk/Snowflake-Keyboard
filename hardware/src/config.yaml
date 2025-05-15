@@ -1,6 +1,6 @@
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 ##
-## This file is a config file from which `ergogen` wil generate the PBCs, SVGs etc. I need those to build my keyboard.
+## This file is a config file from which `ergogen` will generate the PBCs, SVGs etc. I need those to build my keyboard.
 ##
 X-common:
   keyboard.name: &X-Common-name "Snowflake: v1.1.0"
@@ -142,7 +142,17 @@ outlines:
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Cases ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 
-cases.production:
+cases.top:
+  - what: outline
+    name: board
+    extrude: 3
+    operation: subtract
+  - what: outline
+    name: keys
+    extrude: 6
+    operation: subtract
+
+cases.bottom:
   - what: outline
     name: board
     extrude: 3
