@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4.2.2
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v30
+        uses: cachix/install-nix-action@v31
 
       - name: Build packages from flake
         id: build-packages-from-flake
