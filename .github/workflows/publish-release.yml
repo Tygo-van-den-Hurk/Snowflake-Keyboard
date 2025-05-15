@@ -1,0 +1,66 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+
+      - name: Build packages from flake
+        id: build-packages-from-flake
+        run: |
+          mkdir --parents artifacts
+
+          version="${{ github.ref_name }}"
+          system=$(nix eval --impure --expr 'builtins.currentSystem' --json | jq -r .)
+
+          echo "building for ${system}:"
+          for package in $(nix flake show --json | jq -r ".packages.\"${system}\" | keys[]"); do
+
+            echo "Building package: ${package} (${system})"
+            nix build .#${package}
+
+            tar czf "artifacts/${package}-${version}-${system}.tar.gz" -C result .
+
+            if [ -d result ]; then
+              cp result/ artifacts/${package}-${version}-${system}/ --recursive
+            else
+              cp result artifacts/${package}-${version}-${system}
+            fi
+
+            rm -rf result
+          done
+
+      - name: Create release
+        uses: release-drafter/release-drafter@v6.1.0
+        with:
+          publish: true
+          tag: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: softprops/action-gh-release@v2.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: true
+          # globs to files you want to upload:
+          # artifacts/**/*.pdf
+          # artifacts/**/*.stl
+          files: "artifacts/**/*.tar.gz" # always created for each package in the flake
+          # Do not change the body
+          append_body: true
+          body: ""
