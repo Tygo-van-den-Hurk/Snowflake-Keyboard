@@ -1,0 +1,4 @@
+# ~~~ CODE OWNERS ~~~ #
+
+# All nix files are owned by Tygo-van-den-Hurk
+**/*.nix @Tygo-van-den-Hurk
