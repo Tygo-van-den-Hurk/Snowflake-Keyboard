@@ -10,7 +10,7 @@
     - [Building](#building)
     - [Testing](#testing)
     - [Formatting](#formatting)
-  - [Continuous Integration \& Continuous Delivery (CI/CD)](#continuous-integration--continuous-delivery-cicd)
+  - [Continuous Integration and Continuous Delivery (CI/CD)](#continuous-integration-and-continuous-delivery-cicd)
 
 ## Getting started
 
@@ -82,6 +82,6 @@ nix fmt
 
 This will format all files or which there is a formatter installed. There might be warnings that no formatter is installed for some files. This is fine, you can safely ignore those warnings.
 
-## Continuous Integration & Continuous Delivery (CI/CD)
+## Continuous Integration and Continuous Delivery (CI/CD)
 
 The code you write will be automagically tested and deployed. If a mistake was made then these checks will fail, denying merger with the `main` branch. See [how to test locally](#testing).
