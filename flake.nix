@@ -126,6 +126,7 @@
             ++ (with packages; [
               ergogen # generate the files from the config
               openjscad # generate the STL files from JScad files.
+              freerouting # autoroute PCBs so that you don't have to to it yourself
             ])
             ++ (with pkgs; [
               act # Run / check GitHub Actions locally.
@@ -344,9 +345,45 @@
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             installPhase = ''
-              mkdir -p $out/bin
+              runHook preInstall
+
+              mkdir --parents $out/bin
               makeWrapper ${pkgs.nodejs}/bin/node $out/bin/openjscad \
                 --add-flags "${src}/node_modules/.bin/openjscad"
+
+              runHook postInstall
+            '';
+          };
+
+          # Auto routes PCBs for you
+          freerouting = pkgs.stdenv.mkDerivation rec {
+            pname = "freerouting";
+            version = "2.1.0";
+
+            nativeBuildInputs = [ pkgs.makeWrapper ];
+
+            src = pkgs.fetchurl {
+              url = "https://github.com/${pname}/${pname}/releases/download/v${version}/${pname}-${version}.jar";
+              sha256 = "sha256-LAfVj3XawDeCZkCB56WLQcJUANhxqfzxZqLqb+YNXe8=";
+            };
+
+            unpackPhase = ''
+              runHook preUnpack
+              echo "nothing to do..."
+              runHook postUnpack
+            '';
+
+            installPhase = ''
+              runHook preInstall
+
+              mkdir --parents $out/lib
+              cp $src $out/lib/${pname}-${version}.jar
+
+              mkdir --parents $out/bin
+              makeWrapper ${pkgs.zulu23}/bin/java $out/bin/freerouting \
+                --add-flags "-jar $out/lib/${pname}-${version}.jar"
+
+              runHook postInstall
             '';
           };
         };
