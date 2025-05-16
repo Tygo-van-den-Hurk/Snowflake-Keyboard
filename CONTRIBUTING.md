@@ -32,19 +32,13 @@ There are dev shells available that have the packages you'll need. To get into a
 nix develop
 ```
 
-if you're only gonna develop the hardware, or software you can get into a dev shell with only the packages you need for that job by running:
+This might take some time downloading packages the first time. This will also install the pre-commit hooks for you. You can have it automatically enter this dev shell by running:
 
-```SH
-nix develop .#hardware
+```sh
+direnv allow
 ```
 
-or
-
-```SH
-nix develop .#software
-```
-
-This might save time downloading packages you don't need.
+This will direnv start the dev shell the moment you enter the shell.
 
 ### Building
 
