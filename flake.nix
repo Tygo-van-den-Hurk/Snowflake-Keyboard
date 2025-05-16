@@ -125,7 +125,7 @@
             pre-commit-check.enabledPackages # the packages for running/testing pre-commit hooks
             ++ (with packages; [
               ergogen # generate the files from the config
-              jscad # generate the STL files from JScad files.
+              openjscad # generate the STL files from JScad files.
             ])
             ++ (with pkgs; [
               act # Run / check GitHub Actions locally.
@@ -177,7 +177,8 @@
 
           #| ---------------------------------------------- Hardware ----------------------------------------------- |#
 
-          hardware = pkgs.stdenv.mkDerivation rec {
+          # all the hardware files, excluding post processing
+          hardware-raw = pkgs.stdenv.mkDerivation rec {
             name = "pcb";
             src = ./hardware/src;
 
@@ -199,6 +200,29 @@
             '';
           };
 
+          # all the hardware files, including post processing
+          hardware = pkgs.stdenv.mkDerivation rec {
+            name = "pcb";
+            src = ./hardware/src;
+            installPhase = ''
+              runHook preInstall
+
+              mkdir --parents $out/cases
+              cp --recursive ${cases}/* $out/cases
+
+              mkdir --parents $out/pcbs
+              cp --recursive ${pcbs}/* $out/pcbs
+
+              mkdir --parents $out/outlines
+              cp --recursive ${outlines}/* $out/outlines
+
+              mkdir --parents $out/points
+              cp --recursive ${points}/* $out/points
+
+              runHook postInstall
+            '';
+          };
+
           pcbs = pkgs.stdenv.mkDerivation rec {
             name = "pcb";
             src = ./hardware/src;
@@ -206,7 +230,7 @@
               runHook preInstall
 
               mkdir --parents $out
-              cp --recursive ${hardware}/pcbs/* $out
+              cp --recursive ${hardware-raw}/pcbs/* $out
 
               runHook postInstall
             '';
@@ -219,7 +243,7 @@
               runHook preInstall
 
               mkdir --parents $out
-              cp --recursive ${hardware}/outlines/* $out
+              cp --recursive ${hardware-raw}/outlines/* $out
 
               runHook postInstall
             '';
@@ -232,7 +256,7 @@
               runHook preInstall
 
               mkdir --parents $out
-              cp --recursive ${hardware}/points/* $out
+              cp --recursive ${hardware-raw}/points/* $out
 
               runHook postInstall
             '';
@@ -245,15 +269,16 @@
             buildPhase = ''
               runHook preBuild
 
-              # cp --recursive ${hardware}/cases/* .
-
-              # echo ""
-
-              # cat cases/production.jscad
-
-              # echo ""
-
-              # ${jscad}/bin/jscad cases/production.jscad -o cases/production.stl
+              mkdir --parents ./cases
+              cp --recursive ${hardware-raw}/cases/* cases/
+              for file in ./cases/*; do
+                if [ -f "$file" ]; then
+                  echo "trying to convert: $file into an STL file..."
+                  ${openjscad}/bin/openjscad $file -of stl
+                else
+                  echo "$file is not a file, skipping..."
+                fi
+              done
 
               runHook postBuild
             '';
@@ -262,7 +287,7 @@
               runHook preInstall
 
               mkdir --parents $out
-              cp --recursive ${hardware}/cases/* $out
+              cp --recursive cases/* $out
 
               runHook postInstall
             '';
@@ -270,6 +295,7 @@
 
           #| --------------------------------------------- Dependencies -------------------------------------------- |#
 
+          # for reading the config and generating the files.
           ergogen = pkgs.buildNpmPackage {
             pname = "ergogen";
             version = "4.0.2";
@@ -303,47 +329,26 @@
             };
           };
 
-          jscad =
-            let
+          # for converting JS CAD files to STL
+          openjscad = pkgs.stdenv.mkDerivation rec {
+            pname = "openjscad";
+            version = "1.6.1";
 
-              main-repo = pkgs.fetchFromGitHub {
-                owner = "legacy-Tygo-van-den-Hurk/";
-                repo = "OpenJSCAD.org";
-                tag = "@jscad/cli@2.3.5+lockfile";
-                hash = "sha256-hWXtHh4MKxM0X2d9JCq2IDKjAWl5IuzbrhU6XGeepSI=";
-              };
-
-            in
-            pkgs.buildNpmPackage {
-              pname = "jscad";
-              version = "2.3.5";
-
-              forceGitDeps = true;
-
-              src = "${main-repo}/packages/cli";
-              npmDepsHash = "sha256-EE9u/eauhrERi/SmjN87Xkk5C/xW8xR+GHUPdEp/s7c=";
-
-              makeCacheWritable = true;
-              dontNpmBuild = true;
-              dontNpmPrune = true;
-
-              npmPackFlags = [ "--ignore-scripts" ];
-              NODE_OPTIONS = "--openssl-legacy-provider";
-
-              doInstallCheck = true;
-
-              passthru.updateScript = pkgs.nix-update-script { };
-
-              meta = {
-                homepage = "https://openjscad.xyz/";
-                mainProgram = "jscad";
-                license = lib.licenses.mit;
-                description = ''
-                  JSCAD is a set of modular, browser and command line tools for creating parametric 2D and 3D designs
-                  with JavaScript code.
-                '';
-              };
+            src = pkgs.fetchFromGitHub {
+              owner = "legacy-Tygo-van-den-Hurk/";
+              repo = "openjscad-cli-v${version}";
+              tag = "v${version}";
+              hash = "sha256-UPdyA1Bm6CEoh1KxDkaMyyBbDuC/vrBGzp7rIpGZ7pA=";
             };
+
+            nativeBuildInputs = [ pkgs.makeWrapper ];
+
+            installPhase = ''
+              mkdir -p $out/bin
+              makeWrapper ${pkgs.nodejs}/bin/node $out/bin/openjscad \
+                --add-flags "${src}/node_modules/.bin/openjscad"
+            '';
+          };
         };
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
