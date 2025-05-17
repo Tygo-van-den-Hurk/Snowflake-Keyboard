@@ -1,4 +1,4 @@
-> This repository will be used for making of my first custom keyboard.
+> This repository will be used for making of my first custom keyboard: _Snowflake_
 
 <br>
 <center>
@@ -41,12 +41,14 @@
   <a href="https://github.com/Tygo-van-den-Hurk/keyboard/">
     <img src="https://img.shields.io/github/repo-size/Tygo-van-den-Hurk/keyboard?style=flat" alt="the size of the repository" />
   </a>   
+  <br><br>
+  <img src="./hardware/images/svg/snowflake.svg">
 </center>
 <br>
 
-# Keyboard
+# Snowflake
 
-- [Keyboard](#keyboard)
+- [Snowflake](#snowflake)
   - [Overview](#overview)
   - [Documentation](#documentation)
   - [Credits](#credits)
