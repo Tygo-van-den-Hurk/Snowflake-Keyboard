@@ -272,7 +272,7 @@
                   echo "> trying to create SVG images of $pcb..."
                   mkdir --parents $HOME/pcbs/images/svg
                   ${pkgs.kicad}/bin/kicad-cli pcb export svg $pcb \
-                    --layers F.Cu,B.Cu,F.SilkS,F.Mask,B.Mask,Edge.Cuts \
+                    --layers F.Cu,B.Cu,F.SilkS,F.Mask,B.Mask,Edge.Cuts,User.Drawings,User.Comments,User.Eco1,User.Eco2 \
                     --exclude-drawing-sheet --fit-page-to-board \
                     --output $HOME/pcbs/images/svg/$name.svg
 
