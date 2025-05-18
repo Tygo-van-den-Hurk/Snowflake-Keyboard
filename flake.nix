@@ -69,10 +69,10 @@
 
                 root="$(git rev-parse --show-toplevel)/hardware"
 
-                src="$root/src"
+                src="$HOME/pcbs/src"
                 [ -d $src ] && mkdir --parents $src
 
-                out="$root/output"
+                out="$HOME/pcbs/output"
                 [ -d $out ] && mkdir --parents $out
 
                 ${packages.ergogen}/bin/ergogen --debug --clean $src --output $out
@@ -87,7 +87,7 @@
                 set -e
                 nix run .#ergogen
                 root="$(git rev-parse --show-toplevel)/hardware"
-                cp $root/output/pcbs/* $root/kicad/
+                cp $HOME/pcbs/output/pcbs/* $HOME/pcbs/kicad/
               ''
             );
           };
@@ -126,6 +126,7 @@
             ++ (with packages; [
               ergogen # generate the files from the config
               openjscad # generate the STL files from JScad files.
+              freerouting # autoroute PCBs so that you don't have to to it yourself
             ])
             ++ (with pkgs; [
               act # Run / check GitHub Actions locally.
@@ -226,11 +227,68 @@
           pcbs = pkgs.stdenv.mkDerivation rec {
             name = "pcb";
             src = ./hardware/src;
+
+            buildPhase = ''
+              runHook preBuild
+
+              # Patches kicad CLI as it requires a home dir
+              HOME="$(pwd)"
+
+              mkdir --parents $HOME/pcbs/not-routed/kicad/
+              cp --recursive ${hardware-raw}/pcbs/* $HOME/pcbs/not-routed/kicad/
+              for pcb in $HOME/pcbs/not-routed/kicad/*; do
+                if [ -f "$pcb" ]; then
+
+                  name=$(basename "$pcb" | sed 's/\..*//')
+
+                  echo "> trying to convert: $pcb into an DSN file..."
+                  mkdir --parents $HOME/pcbs/not-routed/dns
+                  # ${pkgs.kicad}/bin/kicad-cli pcb export dsn "$pcb" \
+                  #   --output $HOME/pcbs/not-routed/dns/$name.dns
+
+                  echo "> trying to wire $pcb automatically..."
+                  mkdir --parents $HOME/pcbs/pre-routed/ses
+                  mkdir --parents $HOME/pcbs/pre-routed/dns
+                  # ${freerouting}/bin/freerouting -c \
+                  #   -de "$HOME/pcbs/not-routed/dns/$name.dns" \
+                  #   -do "$HOME/pcbs/pre-routed/ses/$name.ses" \
+                  #   -bo "$HOME/pcbs/pre-routed/dns/$name.dns"
+
+                  echo "> converting it back into a kicad PCB..."
+                  mkdir --parents $HOME/pcbs/pre-routed/kicad
+                  # TODO: implement
+
+                  # Seeing if the kicad PCB was produced successfully...
+                  if [ -f $HOME/pcbs/pre-routed/kicad/$name.kicad_pcb ]; then
+                    pcb="$HOME/pcbs/pre-routed/kicad/$name.kicad_pcb"
+                  fi
+
+                  echo "> trying to create PNG images of $pcb..."
+                  mkdir --parents $HOME/pcbs/images/png
+                  ${pkgs.kicad}/bin/kicad-cli pcb render $pcb \
+                    --output $HOME/pcbs/images/png/$name.png \
+                    --quality high
+
+                  echo "> trying to create SVG images of $pcb..."
+                  mkdir --parents $HOME/pcbs/images/svg
+                  ${pkgs.kicad}/bin/kicad-cli pcb export svg $pcb \
+                    --layers F.Cu,B.Cu,F.SilkS,F.Mask,B.Mask,Edge.Cuts,User.Drawings,User.Comments,User.Eco1,User.Eco2 \
+                    --exclude-drawing-sheet --fit-page-to-board \
+                    --output $HOME/pcbs/images/svg/$name.svg
+
+                else
+                  echo "$pcb is not a file, skipping..."
+                fi
+              done
+
+              runHook postBuild
+            '';
+
             installPhase = ''
               runHook preInstall
 
               mkdir --parents $out
-              cp --recursive ${hardware-raw}/pcbs/* $out
+              cp --recursive $HOME/pcbs/* $out
 
               runHook postInstall
             '';
@@ -344,9 +402,45 @@
             nativeBuildInputs = [ pkgs.makeWrapper ];
 
             installPhase = ''
-              mkdir -p $out/bin
+              runHook preInstall
+
+              mkdir --parents $out/bin
               makeWrapper ${pkgs.nodejs}/bin/node $out/bin/openjscad \
                 --add-flags "${src}/node_modules/.bin/openjscad"
+
+              runHook postInstall
+            '';
+          };
+
+          # Auto routes PCBs for you
+          freerouting = pkgs.stdenv.mkDerivation rec {
+            pname = "freerouting";
+            version = "2.1.0";
+
+            nativeBuildInputs = [ pkgs.makeWrapper ];
+
+            src = pkgs.fetchurl {
+              url = "https://github.com/${pname}/${pname}/releases/download/v${version}/${pname}-${version}.jar";
+              sha256 = "sha256-LAfVj3XawDeCZkCB56WLQcJUANhxqfzxZqLqb+YNXe8=";
+            };
+
+            unpackPhase = ''
+              runHook preUnpack
+              echo "nothing to do..."
+              runHook postUnpack
+            '';
+
+            installPhase = ''
+              runHook preInstall
+
+              mkdir --parents $out/lib
+              cp $src $out/lib/${pname}-${version}.jar
+
+              mkdir --parents $out/bin
+              makeWrapper ${pkgs.zulu23}/bin/java $out/bin/freerouting \
+                --add-flags "-jar $out/lib/${pname}-${version}.jar"
+
+              runHook postInstall
             '';
           };
         };
