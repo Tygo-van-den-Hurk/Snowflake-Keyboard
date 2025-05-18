@@ -1,7 +1,7 @@
-> This repository will be used for making of my first custom keyboard.
+> This repository will be used for making of my first custom keyboard: _Snowflake_
 
 <br>
-<center>
+<div align="center">
   <!--~ Tools ~-->
   <a href="https://nixos.org">
     <img src="https://img.shields.io/badge/Built_With-Nix-5277C3.svg?style=flat&logo=nixos&labelColor=73C3D5" alt="Built with Nix"/>
@@ -41,12 +41,14 @@
   <a href="https://github.com/Tygo-van-den-Hurk/keyboard/">
     <img src="https://img.shields.io/github/repo-size/Tygo-van-den-Hurk/keyboard?style=flat" alt="the size of the repository" />
   </a>   
-</center>
+  <br><br>
+  <img src="./hardware/images/svg/snowflake.svg">
+</div>
 <br>
 
-# Keyboard
+# Snowflake
 
-- [Keyboard](#keyboard)
+- [Snowflake](#snowflake)
   - [Overview](#overview)
   - [Documentation](#documentation)
   - [Credits](#credits)
